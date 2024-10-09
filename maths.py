@@ -17,7 +17,7 @@ from visualization import RESOLUTION
 # CUDA -----------------------------------------------------------------------------------------------------------------
 
 # The number of threads per block in x- and y-direction.
-THREADS_PER_BLOCK = (32, 32)
+THREADS_PER_BLOCK = (16, 16)
 
 
 def execute(kernel: CUDADispatcher, *args: Tuple[DeviceNDArray, ...], result: Optional[DeviceNDArray] = None) -> \

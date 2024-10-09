@@ -14,6 +14,14 @@ from numba.cuda.cudadrv.devicearray import DeviceNDArray
 from typing import Tuple
 from visualization import RESOLUTION
 
+# CONTROL --------------------------------------------------------------------------------------------------------------
+
+# Allow the wing to be moved by the force coming from the fluid?
+#
+# Note that the motion is not accurate, because no conservation mechanism is implemented for the regions where the wing
+# is removed or added.
+MOVE_WING = False
+
 # CONSTANTS ------------------------------------------------------------------------------------------------------------
 
 # The dynamic viscosity.
@@ -45,6 +53,9 @@ INITIAL_VELOCITY = (1, 0)
 # The density of the wing.
 WING_RHO = 0.7 * INITIAL_RHO[0]
 
+# The initial wing position.
+INITIAL_WING_POSITION = (RESOLUTION[0] / 2, RESOLUTION[1] / 2)
+
 # The radius of the wing.
 WING_RADIUS = 10
 
@@ -57,24 +68,26 @@ RANGE_RHO = (0.01, 1)
 MAX_SPEED = 1
 
 
-def initialize_physics() -> Tuple[DeviceNDArray, DeviceNDArray]:
+def initialize_physics() -> Tuple[DeviceNDArray, DeviceNDArray, Tuple[float, float]]:
     """
     Initialize the physical fields.
 
     Returns:
-        The density rho and the velocity u.
+        The density rho, the velocity u and the wing position.
     """
+    wing_position = INITIAL_WING_POSITION
+
     rho = cuda.device_array(RESOLUTION, dtype=np.float32)
 
     execute(vertical_exponential, rho, *INITIAL_RHO, False)
-    execute(fix_s, rho, (RESOLUTION[0] / 2, RESOLUTION[1] / 2), WING_RADIUS, WING_RHO)
+    execute(fix_s, rho, wing_position, WING_RADIUS, WING_RHO)
 
     u = cuda.device_array(rho.shape + (2,), dtype=rho.dtype)
 
     u[:, :, 0] = INITIAL_VELOCITY[0]
     u[:, :, 1] = INITIAL_VELOCITY[1]
 
-    return cuda.to_device(rho), cuda.to_device(u)
+    return cuda.to_device(rho), cuda.to_device(u), wing_position
 
 
 def compute_p(rho: DeviceNDArray) -> DeviceNDArray:
@@ -190,33 +203,35 @@ def compute_du_dt(u: DeviceNDArray, rho: DeviceNDArray) -> DeviceNDArray:
     return execute(scale_add_v, product, du_dt, factor)
 
 
-def constrain_rho(rho: DeviceNDArray):
+def constrain_rho(rho: DeviceNDArray, wing_position: Tuple[float, float]):
     """
     Constrain the density rho.
 
     Args:
         rho: The density.
+        wing_position: The wing position.
     """
     execute(clamp_s, rho, *RANGE_RHO)
 
     execute(vertical_exponential, rho, *INITIAL_RHO, True)
-    execute(fix_s, rho, (RESOLUTION[0] / 2, RESOLUTION[1] / 2), WING_RADIUS, WING_RHO)
+    execute(fix_s, rho, wing_position, WING_RADIUS, WING_RHO)
 
 
-def constrain_u(u: DeviceNDArray):
+def constrain_u(u: DeviceNDArray, wing_position: Tuple[float, float]):
     """
     Constrain the velocity u.
 
     Args:
         u: The velocity.
+        wing_position: The wing position.
     """
     execute(clamp_v, u, MAX_SPEED)
 
     execute(grid_boundary, u, INITIAL_VELOCITY)
-    execute(fix_v, u, (RESOLUTION[0] / 2, RESOLUTION[1] / 2), WING_RADIUS, (0, 0))
+    execute(fix_v, u, wing_position, WING_RADIUS, (0, 0))
 
 
-def update(rho: DeviceNDArray, u: DeviceNDArray):
+def update_rho_u(rho: DeviceNDArray, u: DeviceNDArray, wing_position: Tuple[float, float]):
     """
     Update the density rho and velocity u via 4th order Runge-Kutta according to
         drho/dt = - div (rho * u)
@@ -225,6 +240,7 @@ def update(rho: DeviceNDArray, u: DeviceNDArray):
     Args:
         rho: The density.
         u: The velocity.
+        wing_position: The wing position.
     """
     k1_rho = compute_drho_dt(rho, u)
     k1_u = compute_du_dt(u, rho)
@@ -232,8 +248,8 @@ def update(rho: DeviceNDArray, u: DeviceNDArray):
     rho_prime = execute(scale_add_s, k1_rho, rho, DT / 2)
     u_prime = execute(scale_add_v, k1_u, u, DT / 2)
 
-    constrain_rho(rho_prime)
-    constrain_u(u_prime)
+    constrain_rho(rho_prime, wing_position)
+    constrain_u(u_prime, wing_position)
 
     k2_rho = compute_drho_dt(rho_prime, u_prime)
     k2_u = compute_du_dt(u_prime, rho_prime)
@@ -241,8 +257,8 @@ def update(rho: DeviceNDArray, u: DeviceNDArray):
     rho_prime = execute(scale_add_s, k2_rho, rho, DT / 2)
     u_prime = execute(scale_add_v, k2_u, u, DT / 2)
 
-    constrain_rho(rho_prime)
-    constrain_u(u_prime)
+    constrain_rho(rho_prime, wing_position)
+    constrain_u(u_prime, wing_position)
 
     k3_rho = compute_drho_dt(rho_prime, u_prime)
     k3_u = compute_du_dt(u_prime, rho_prime)
@@ -250,8 +266,8 @@ def update(rho: DeviceNDArray, u: DeviceNDArray):
     rho_prime = execute(scale_add_s, k3_rho, rho, DT)
     u_prime = execute(scale_add_v, k3_u, u, DT)
 
-    constrain_rho(rho_prime)
-    constrain_u(u_prime)
+    constrain_rho(rho_prime, wing_position)
+    constrain_u(u_prime, wing_position)
 
     k4_rho = compute_drho_dt(rho_prime, u_prime)
     k4_u = compute_du_dt(u_prime, rho_prime)
@@ -262,5 +278,36 @@ def update(rho: DeviceNDArray, u: DeviceNDArray):
     execute(forward_euler_s, rho, drho_dt)
     execute(forward_euler_v, u, du_dt)
 
-    constrain_rho(rho)
-    constrain_u(u)
+    constrain_rho(rho, wing_position)
+    constrain_u(u, wing_position)
+
+
+def update_wing_position(rho: DeviceNDArray, u: DeviceNDArray, wing_position: Tuple[float, float]) -> \
+        Tuple[float, float]:
+    """
+    Update the wing position according to the forces on the wing.
+
+    Args:
+        rho: The density.
+        u: The velocity.
+        wing_position: The wing position.
+
+    Returns:
+        The updated wing position.
+    """
+    p = compute_p(rho)
+
+    force = np.zeros(2, dtype=np.float32)
+    force = cuda.to_device(force)
+
+    execute(compute_force, rho, p, u, wing_position, WING_RADIUS, force)
+    force = force.copy_to_host()
+
+    x = wing_position[0]
+    y = wing_position[1]
+
+    if MOVE_WING:
+        x += DT * float(force[0])
+        y += DT * float(force[1])
+
+    return x, y
