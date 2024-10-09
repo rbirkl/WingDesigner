@@ -12,14 +12,21 @@ import numpy as np
 from numba.cuda.dispatcher import CUDADispatcher
 from pygame.surface import Surface
 
+# SIMULATION -----------------------------------------------------------------------------------------------------------
+
+# The window title.
+TITLE = "Wing Designer"
+
 # The resolution as (width, height).
-RESOLUTION = (256, 128)
+RESOLUTION = (512, 256)
+
+# ARROW VISUALIZATION --------------------------------------------------------------------------------------------------
 
 # The stride which determines how many vectors are visualized.
 STRIDE = 20
 
 # The scale of the vectors when visualized.
-SCALE = 1000
+SCALE = 15
 
 # The size of the visualized arrow heads.
 HEAD_SIZE = 5
@@ -39,6 +46,7 @@ def initialize_visualization() -> Surface:
         The visualization screen.
     """
     pygame.init()
+    pygame.display.set_caption(TITLE)
     return pygame.display.set_mode(RESOLUTION)
 
 
@@ -51,7 +59,7 @@ def visualize_scalar(screen: Surface, scalar: CUDADispatcher):
         scalar: The scalar of shape (width, height).
     """
     scalar = scalar.copy_to_host()
-    field = ((scalar+1) * 127.5).astype(np.uint8)
+    field = (scalar * 255).astype(np.uint8)
     field_rgb = np.stack((field, field, field), axis=-1)
     surface = pygame.surfarray.make_surface(field_rgb)
     screen.blit(surface, (0, 0))
@@ -79,8 +87,8 @@ def visualize_vector(screen: Surface, vector: CUDADispatcher):
             pygame.gfxdraw.aatrigon(screen, *tail, *int_head, *int_head, COLOR_ARROW)
 
             angle = np.arctan2(head[1] - tail[1], head[0] - tail[0])
-            angle_minus = angle - HEAD_ANGLE*np.pi
-            angle_plus = angle + HEAD_ANGLE*np.pi
+            angle_minus = angle - HEAD_ANGLE * np.pi
+            angle_plus = angle + HEAD_ANGLE * np.pi
             arrow_points = [(head[0] - HEAD_SIZE * np.cos(angle_minus), head[1] - HEAD_SIZE * np.sin(angle_minus)),
                             (head[0] - HEAD_SIZE * np.cos(angle_plus), head[1] - HEAD_SIZE * np.sin(angle_plus)),
                             head]

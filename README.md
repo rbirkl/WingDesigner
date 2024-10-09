@@ -1,2 +1,2 @@
 # Wing Designer
-A designer of airplane wings via machine learning
+A designer of airplane wings via machine learning.

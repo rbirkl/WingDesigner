@@ -1,114 +1,46 @@
+# Copyright (c) 2024 Reiner Birkl
+#
 # This file is part of the Wing Designer project.
 #
 # Wing Designer is licensed under license in the LICENSE file of the root directory.
 
-# DERIVATION OF NUMERIC FORMALISM OF NAVIER-STOKES IN 2D VIA STREAM FUNCTION AND GREEN FUNCTIONS
+# DERIVATION OF NUMERIC FORMALISM OF NAVIER-STOKES IN 2D
 #
-# According to https://en.wikipedia.org/wiki/Navier-Stokes_equations, the incompressible Navier-Stokes equations with
+# According to https://en.wikipedia.org/wiki/Navier-Stokes_equations, the compressible Navier-Stokes equations with
 # constant viscosity are as follows:
 #
 #   Fields:
-#     u = velocity
-#     p = pressure
+#     rho = density
+#     u   = velocity
+#     p   = pressure
 #
 #   Constants:
-#     rho = density (constant due to incompressibility)
-#     nu  = viscosity
-#     f   = force
+#     mu   = dynamic viscosity
+#     zeta = bulk viscosity
+#     f    = force
+#     R    = specific gas constant
+#     T    = temperature
 #
 #   Equations:
-#     --------------------------------------------------------------
-#     | div u = 0                                                  |                                                 (1)
-#     | du/dt + u * grad u - nu * Delta u = - (1/rho) * grad p + f |                                                 (2)
-#     --------------------------------------------------------------
+#     ------------------------------------------------------------------------------------------------
+#     | drho/dt + div (rho * u) = 0                                                                  |               (1)
+#     | rho * (du/dt + (u * grad)u) = -grad p + mu * div ( grad u + (grad u)^T - (2/3) * I * div u ) |
+#                                     + zeta * grad div u + rho * f                                  |               (2)
+#     | p = rho R T                                                                                  |               (3)
+#     ------------------------------------------------------------------------------------------------
 #
-# We limit ourselves to the 2D case such that we can use the stream function formalism, based on the stream function
-# psi:
+# Let us rewrite these equations such that they can be used for a numeric solver. Equation (1) can be written as
 #
-#   u = (dpsi/dy, -dpsi/dx)                                                                                          (3)
+#   drho/dt = - div (rho * u)
 #
-#  Hence, the equation of incompressibility (1) is automatically satisfied as
+# For equation (2), we get
 #
-#    div u = du_x/dx + du_y/dy
-#          = d^2psi/(dy*dx) - d^2psi/(dx*dy)
-#          = 0
+#   du/dt = - (u * grad)u - (grad p - mu * ( Delta u + (1/3) grad div u ) - zeta * grad div u) / rho + f
 #
-# The momentum equation (2) can be split into
+# Hence equations (1-3) can be written as
 #
-#   du_x/dt + u * grad u_x - nu * Delta u_x = - (1/rho) * dp/dx + f_x
-#   du_y/dt + u * grad u_y - nu * Delta u_y = - (1/rho) * dp/dy + f_y
-#
-# such that definition (3) yields
-#
-#     d^2psi/(dy*dt) + u * grad dpsi/dy - nu * Delta dpsi/dy = - (1/rho) * dp/dx + f_x                               (4)
-#   - d^2psi/(dx*dt) - u * grad dpsi/dx + nu * Delta dpsi/dx = - (1/rho) * dp/dy + f_y                               (5)
-#
-# Hence, we can create a Laplacian for the time derivative by using
-#
-#    d^3psi/(dy*dy*dt) + d(u * grad dpsi/dy)/dy - nu * Delta d^2psi/(dy*dy) = - (1/rho) * d^2p/(dx*dy)
-#    d^3psi/(dx*dx*dt) + d(u * grad dpsi/dx)/dx - nu * Delta d^2psi/(dx*dx) =   (1/rho) * d^2p/(dy*dx)
-#
-# such that
-#
-#    Delta dpsi/dt + d(u * grad dpsi/dy)/dy + d(u * grad dpsi/dx)/dx - nu * Delta^2 psi = 0
-#
-# Here,
-#
-#     d(u * grad dpsi/dy)/dy + d(u * grad dpsi/dx)/dx
-#    = du/dy * grad dpsi/dy + du/dx * grad dpsi/dx + u * grad d^2psi/(dy*dy) + u * grad d^2psi/(dx*dx)
-#    = du_x/dy * d^psi/(dx*dy) + du_y/dy * d^2psi/(dy*dy) + du_x/dx * d^2psi/(dx*dx) + du_y/dx * d^2psi/(dy*dx)
-#      + u * grad Delta psi
-#    =   d^2psi/(dy*dy) * d^2psi/(dx*dy) - d^2psi/(dx*dy) * d^2psi/(dy*dy)
-#      + d^2psi/(dy*dx) * d^2psi/(dx*dx) - d^2psi/(dx*dx) * d^2psi/(dy*dx)
-#      + u * grad Delta psi
-#    = u * grad Delta psi
-#
-# such that
-#
-#    Delta dpsi/dt + u * grad Delta psi = nu * Delta^2 psi
-#
-# or
-#
-#    Delta dpsi/dt + dpsi/dy * Delta dpsi/dx - dpsi/dx * Delta dpsi/dy = nu * Delta^2 psi
-#
-# and thus we arrive at the evolution equation of the stream function
-#
-#    dpsi/dt = Delta^(-1) ( dpsi/dx * Delta dpsi/dy - dpsi/dy * Delta dpsi/dx + nu * Delta^2 psi )                   (6)
-#
-# For the pressure, we return to equations (4+5) and use this time
-#
-#     d^3psi/(dy*dx*dt) + d(u * grad dpsi/dy)/dx - nu * Delta d^2psi/(dy*dx) = - (1/rho) * d^2p/(dx*dx)
-#    -d^3psi/(dx*dy*dt) - d(u * grad dpsi/dx)/dy + nu * Delta d^2psi/(dx*dy) = - (1/rho) * d^2p/(dy*dy)
-#
-# such that summing both equations yields
-#
-#     - (1/rho) * Delta p
-#     = d(u * grad dpsi/dy)/dx - d(u * grad dpsi/dx)/dy
-#     = du/dx * grad dpsi/dy - du/dy * grad dpsi/dx
-#     = du_x/dx * d^2psi/(dx*dy) + du_y/dx * d^2psi/(dy*dy) - du_x/dy * d^2psi/(dx*dx) - du_y/dy * d^2psi/(dy*dx)
-#     =   d^2psi/(dy*dx) * d^2psi/(dx*dy) - d^2psi/(dx*dx) * d^2psi/(dy*dy)
-#       - d^2psi/(dy*dy) * d^2psi/(dx*dx) + d^2psi/(dx*dy) * d^2psi/(dy*dx)
-#     =   2 * ( d^2psi/(dx*dy) * d^2psi/(dx*dy) - (d^2psi/(dx*dx))^2 )
-#
-# or
-#
-#   p = 2 rho Delta^(-1) ( (d^2psi/(dx*dx))^2 - d^2psi/(dx*dy) * d^2psi/(dx*dy))
-#
-# Together with equations (3+6), we thus have
-#
-#   u = (dpsi/dy, -dpsi/dx)
-#
-#   dpsi/dt = Delta^(-1) ( dpsi/dx * Delta dpsi/dy - dpsi/dy * Delta dpsi/dx + nu * Delta^2 psi )
-#   p       = 2 rho Delta^(-1) ( (d^2psi/(dx*dx))^2 - d^2psi/(dx*dy) * d^2psi/(dx*dy))
-#
-# Using the Green function formalism of (3.28) of https://mediatum.ub.tum.de/doc/966092/966092.pdf, we thus arrive at
-#
-#  ---------------------------------------------------------------------------------------------------------------------
-#  | u = (dpsi/dy, -dpsi/dx)                                                                                           |
-#  |                                                                                                                   |
-#  | dpsi(x,y)/dt = (1/(2*pi)) int dx'dy' ln ((x-x')^2 + (y-y')^2)^(1/2) (  dpsi(x',y')/dx' * Delta' dpsi(x',y')/dy'   |
-#  |                                                                      - dpsi(x',y')/dy' * Delta' dpsi(x',y')/dx'   |
-#  |                                                                      + nu * Delta'^2 psi(x',y') )                 |
-#  | p(x,y) = (rho/pi) int dx'dy' ln ((x-x')^2 + (y-y')^2)^(1/2) ( (d^2psi(x',y')/(dx'*dx'))^2                         |
-#  |                                                              - d^2psi(x',y')/(dx'*dy') * d^2psi(x',y')/(dx'*dy')) |
-#  ---------------------------------------------------------------------------------------------------------------------
+#     -----------------------------------------------------------------------------------------------
+#     | drho/dt = - div (rho * u)                                                                   |
+#     | du/dt   = - (u * grad)u - (grad p - mu * Delta u - (mu / 3 + zeta) * grad div u) / rho  + f |
+#     | p       = rho R T                                                                           |
+#     -----------------------------------------------------------------------------------------------
