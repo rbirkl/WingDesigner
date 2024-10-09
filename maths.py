@@ -11,13 +11,15 @@ from kernels import *
 from numba import cuda
 from numba.cuda.cudadrv.devicearray import DeviceNDArray
 from numba.cuda.dispatcher import CUDADispatcher
+from numpy import ndarray
+from scipy.special import comb
 from typing import Optional, Tuple
 from visualization import RESOLUTION
 
 # CUDA -----------------------------------------------------------------------------------------------------------------
 
 # The number of threads per block in x- and y-direction.
-THREADS_PER_BLOCK = (16, 16)
+THREADS_PER_BLOCK = (32, 32)
 
 
 def execute(kernel: CUDADispatcher, *args: Tuple[DeviceNDArray, ...], result: Optional[DeviceNDArray] = None) -> \
@@ -165,3 +167,16 @@ def grad_div(vector: DeviceNDArray) -> DeviceNDArray:
     ddiv_vector_dy = execute(d_dy, div_vector)
 
     return execute(combine, ddiv_vector_dx, ddiv_vector_dy)
+
+
+def bezier_curve(control_points: ndarray, number_points) -> ndarray:
+    n = len(control_points) - 1
+    t_values = np.linspace(0, 1, number_points)
+
+    curve_points = np.zeros((number_points, 2))
+    for i in range(number_points):
+        t = t_values[i]
+        for j in range(n + 1):
+            curve_points[i] += comb(n, j) * (t ** j) * ((1 - t) ** (n - j)) * control_points[j]
+
+    return np.vstack([curve_points, curve_points[0]], dtype=np.float32)

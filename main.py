@@ -6,7 +6,9 @@
 
 import pygame
 
-from physics import initialize_physics, update_rho_u, update_wing_position, WING_RADIUS
+import numpy as np
+
+from physics import initialize_physics, update_physics
 from time import time
 from visualization import initialize_visualization, visualize_scalar, visualize_vector
 
@@ -17,7 +19,7 @@ COLOR_WING = (255, 0, 0)
 def main():
     screen = initialize_visualization()
 
-    rho, u, wing_position = initialize_physics()
+    rho, u, wing_position, wing = initialize_physics()
 
     frame = 0
     start_time = time()
@@ -29,10 +31,9 @@ def main():
 
         visualize_scalar(screen, rho)
         visualize_vector(screen, u)
-        pygame.gfxdraw.aacircle(screen, int(wing_position[0]), int(wing_position[1]), WING_RADIUS, COLOR_WING)
+        pygame.gfxdraw.aapolygon(screen, np.array(wing_position) + wing, COLOR_WING)
 
-        update_rho_u(rho, u, wing_position)
-        wing_position = update_wing_position(rho, u, wing_position)
+        wing_position = update_physics(rho, u, wing_position, wing)
 
         pygame.display.flip()
 

@@ -417,7 +417,7 @@ def forward_euler_v(vector, dvector_dt):
         dvector_dt: The temporal derivative of the vector.
     """
     x, y = cuda.grid(2)
-    if (x < vector.shape[0]) and y < (vector.shape[1]):
+    if (x < vector.shape[0]) and (y < vector.shape[1]):
         vector[x, y, 0] += DT * dvector_dt[x, y, 0]
         vector[x, y, 1] += DT * dvector_dt[x, y, 1]
 
@@ -456,7 +456,7 @@ def clamp_v(vector, maximum_length):
         maximum_length: The maximally allowed length.
     """
     x, y = cuda.grid(2)
-    if (x < vector.shape[0]) and y < (vector.shape[1]):
+    if (x < vector.shape[0]) and (y < vector.shape[1]):
         length = (vector[x, y, 0] ** 2 + vector[x, y, 1] ** 2) ** 0.5
         if length > maximum_length:
             factor = maximum_length / length
@@ -482,48 +482,109 @@ def length(vector, result):
 
 
 # @formatter:off
-FIX_S_SHAPE_PER_CELL = None
+INSIDE_POLYGON_SHAPE_PER_CELL = None
 # @formatter:on
 @cuda.jit
-def fix_s(scalar, center, radius, value):
+def inside_polygon(center, polygon, result):
     """
-    Fix a scalar to a value within a given circle.
+    Check if a grid cell is within a polygon.
 
     Args:
-        scalar: The considered scalar.
-        center: The center of the circle.
-        radius: The radius of the circle.
-        value: The value to be set.
+        center: The center of the polygon.
+        polygon: The radius of the polygon.
+        result: Is the grid cell in the polygon?
+    """
+    x, y = cuda.grid(2)
+    if (x < result.shape[0]) and y < (result.shape[1]):
+        length = len(polygon)
+        is_inside = False
+
+        p1_x, p1_y = center[0] + polygon[0, 0], center[1] + polygon[0, 1]
+        for index in range(length + 1):
+            p2_x, p2_y = center[0] + polygon[index % length, 0], center[1] + polygon[index % length, 1]
+            if (y > min(p1_y, p2_y)) and (y <= max(p1_y, p2_y)) and (x <= max(p1_x, p2_x)):
+                if p1_y != p2_y:
+                    intersection_x = (y - p1_y) * (p2_x - p1_x) / (p2_y - p1_y) + p1_x
+                if (p1_x == p2_x) or (x <= intersection_x):
+                    is_inside = not is_inside
+            p1_x, p1_y = p2_x, p2_y
+
+        result[x, y] = is_inside
+
+
+# @formatter:off
+NORMAL_SHAPE_PER_CELL = (2,)
+# @formatter:on
+@cuda.jit
+def normal(scalar, center, polygon, result):
+    """
+    Compute the normals of a polygon.
+
+    Args:
+        scalar: A scalar which defines the grid.
+        center: The center of the polygon.
+        polygon: The radius of the polygon.
+        result: The result of the operator as a vector.
     """
     x, y = cuda.grid(2)
     if (x < scalar.shape[0]) and y < (scalar.shape[1]):
-        dx = x - center[0]
-        dy = y - center[1]
-        if dx ** 2 + dy ** 2 < radius ** 2:
-            scalar[x, y] = value
+        closest_index = 0
+        min_distance2 = 1e100
+
+        for index, point in enumerate(polygon):
+            distance2 = (center[0] + point[0] - x) ** 2 + (center[1] + point[1] - y) ** 2
+            if distance2 < min_distance2:
+                min_distance2 = distance2
+                closest_index = index
+
+        point_0 = polygon[closest_index]
+        point_1 = polygon[(closest_index - 1) % len(polygon)]
+
+        direction_x = point_1[1] - point_0[1]
+        direction_y = point_0[0] - point_1[0]
+
+        length = (direction_x ** 2 + direction_y ** 2) ** 0.5
+        factor = 1 / length if length > 0 else 0
+
+        result[x, y, 0] = factor * direction_x
+        result[x, y, 1] = factor * direction_y
+
+
+# @formatter:off
+FIX_S_SHAPE_PER_CELL = None
+# @formatter:on
+@cuda.jit
+def fix_s(scalar, mask, value):
+    """
+    Fix a scalar to a value within a masked region.
+
+    Args:
+        scalar: The considered scalar.
+        mask: The mask where to fix the value.
+        value: The value to be set.
+    """
+    x, y = cuda.grid(2)
+    if (x < scalar.shape[0]) and (y < scalar.shape[1]) and mask[x, y]:
+        scalar[x, y] = value
 
 
 # @formatter:off
 FIX_V_SHAPE_PER_CELL = None
 # @formatter:on
 @cuda.jit
-def fix_v(vector, center, radius, value):
+def fix_v(vector, mask, value):
     """
-    Fix a vector to a value within a given circle.
+    Fix a vector to a value within a masked region.
 
     Args:
         vector: The considered vector.
-        center: The center of the circle.
-        radius: The radius of the circle.
+        mask: The mask where to fix the value.
         value: The value to be set.
     """
     x, y = cuda.grid(2)
-    if (x < vector.shape[0]) and y < (vector.shape[1]):
-        dx = x - center[0]
-        dy = y - center[1]
-        if dx ** 2 + dy ** 2 < radius ** 2:
-            vector[x, y, 0] = value[0]
-            vector[x, y, 1] = value[1]
+    if (x < vector.shape[0]) and (y < vector.shape[1]) and mask[x, y]:
+        vector[x, y, 0] = value[0]
+        vector[x, y, 1] = value[1]
 
 
 # @formatter:off
@@ -583,9 +644,9 @@ def grid_boundary(vector, value):
 COMPUTE_FORCE_SHAPE_PER_CELL = None
 # @formatter:on
 @cuda.jit
-def compute_force(rho, p, u, center, radius, force):
+def compute_force(rho, p, u, mask, normal, force):
     """
-    Compute the force applied on a circle.
+    Compute the force applied on the boundary of a mask.
 
     This computation is done heuristically on grid cell centers which have at least one neighboring wing cell and the
     used area element is assumed to be unity.
@@ -594,35 +655,25 @@ def compute_force(rho, p, u, center, radius, force):
         rho: The density.
         p: The pressure.
         u: The velocity.
-        center: The center of the circle.
-        radius: The radius of the circle.
+        mask: The considered mask.
+        normal: The normal vectors of the closest point on the mask boundary.
         force: The computed force
     """
     x, y = cuda.grid(2)
-    if (x < p.shape[0]) and y < (p.shape[1]):
-        dx = x - center[0]
-        dy = y - center[1]
-        length2 = dx ** 2 + dy ** 2
-        if length2 >= radius ** 2:
-            one_cell_inside = False
-            for xp in range(max(0, x - 1), min(x + 2, p.shape[0])):
-                for yp in range(max(0, y - 1), min(y + 2, p.shape[1])):
-                    dxp = xp - center[0]
-                    dyp = yp - center[1]
-                    if dxp ** 2 + dyp ** 2 < radius ** 2:
-                        one_cell_inside = True
-                        break
-                if one_cell_inside:
+    if (x < p.shape[0]) and (y < p.shape[1]) and not mask[x, y]:
+        one_cell_inside = False
+        for xp in range(max(0, x - 1), min(x + 2, p.shape[0])):
+            for yp in range(max(0, y - 1), min(y + 2, p.shape[1])):
+                if mask[xp, yp]:
+                    one_cell_inside = True
                     break
-            if one_cell_inside:
-                factor = 1 / length2 ** 0.5
-                normal = (factor * dx, factor * dy)
-                pressure_force = (-p[x, y] * normal[0], -p[x, y] * normal[1])
+        if one_cell_inside:
+            pressure_force = (-p[x, y] * normal[x, y, 0], -p[x, y] * normal[x, y, 1])
 
-                u_dot_normal = u[x, y, 0] * normal[0] + u[x, y, 1] * normal[1]
-                momentum_flux = (rho[x, y] * u_dot_normal * normal[0], rho[x, y] * u_dot_normal * normal[1])
+            u_dot_normal = u[x, y, 0] * normal[x, y, 0] + u[x, y, 1] * normal[x, y, 1]
+            momentum_flux = (rho[x, y] * u_dot_normal * normal[x, y, 0], rho[x, y] * u_dot_normal * normal[x, y, 1])
 
-                force_per_cell = (pressure_force[0] + momentum_flux[0], pressure_force[1] + momentum_flux[1])
+            force_per_cell = (pressure_force[0] + momentum_flux[0], pressure_force[1] + momentum_flux[1])
 
-                for index in range(2):
-                    cuda.atomic.add(force, index, force_per_cell[index])
+            for index in range(2):
+                cuda.atomic.add(force, index, force_per_cell[index])
