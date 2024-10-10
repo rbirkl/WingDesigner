@@ -18,7 +18,7 @@ from visualization import visualize_scalar, visualize_vector
 # CONTROL --------------------------------------------------------------------------------------------------------------
 
 # Generate labels and store them on the disk (otherwise they are loaded)?
-GENERATE_LABELS = False
+GENERATE_LABELS = True
 
 # INPUT SPACE ----------------------------------------------------------------------------------------------------------
 
