@@ -2,6 +2,10 @@
 
 An AI-based designer of optimal airplane wings.
 
+## Demo
+
+https://github.com/user-attachments/assets/c96a7835-cab7-4433-9b60-bbe232aaa105
+
 ## Contents
 
 - [Installation](#installation)
