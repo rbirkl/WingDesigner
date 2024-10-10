@@ -1,3 +1,9 @@
+# Copyright (c) 2024 Reiner Birkl
+#
+# This file is part of the Wing Designer project.
+#
+# Wing Designer is licensed under license in the LICENSE file of the root directory.
+
 import pygame
 import random
 import torch
