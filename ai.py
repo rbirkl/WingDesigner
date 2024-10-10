@@ -210,6 +210,8 @@ def train(inputs: Tensor, labels: Tensor) -> Module:
     Returns:
         The trained model.
     """
+    print("Training surrogate model")
+
     inputs = inputs.view(inputs.shape[0], -1)
 
     input_size = inputs.shape[1]
@@ -242,7 +244,7 @@ def train(inputs: Tensor, labels: Tensor) -> Module:
                 loss.backward()
                 optimizer.step()
 
-                print(f"Fold: {fold}, Epoch: {epoch}, Loss: {loss.item():.1f}")
+                print(f"  Fold: {fold}, Epoch: {epoch}, Loss: {loss.item():.1f}")
 
         model_weights.append(model.state_dict())
 
@@ -251,12 +253,12 @@ def train(inputs: Tensor, labels: Tensor) -> Module:
             output = model(validation_inputs)
             loss = criterion(output, validation_labels).item()
             print()
-            print(f"Validation loss: {loss:.1f}")
+            print(f"  Validation loss: {loss:.1f}")
             print()
             validation_losses.append(loss)
 
     formatted_losses = [f"{loss:.1f}" for loss in validation_losses]
-    print(f"Validation losses: {', '.join(formatted_losses)}")
+    print(f"  Validation losses: {', '.join(formatted_losses)}")
     print()
 
     averaged_weights = average_model_weights(model_weights)
@@ -279,6 +281,7 @@ def optimize(inputs: Tensor, model: Module) -> Tensor:
     Returns:
         The optimized input.
     """
+    print("Optimizing wing parameters via particle swarm")
     indices = torch.randperm(inputs.shape[0])[:NUMBER_PARTICLES]
     particles = inputs[indices].view(NUMBER_PARTICLES, -1)
 
@@ -310,7 +313,7 @@ def optimize(inputs: Tensor, model: Module) -> Tensor:
             particles[index] += ATTRACTION_OPTIMIZATION * (particles[best_index] - particles[index])
 
         if iteration % ITERATIONS_PER_LOG == 0:
-            print(f"Iteration {iteration}, Loss: {min_loss.item():.4f}")
+            print(f"  Iteration {iteration}, Loss: {min_loss.item():.4f}")
 
     print()
 

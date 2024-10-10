@@ -62,6 +62,8 @@ def main():
 
     inputs, labels = generate_labels(screen)
     model = train(inputs, labels)
+
+    pygame.quit()
     optimized_input = optimize(inputs, model)
 
     screen = initialize_visualization("Optimum")

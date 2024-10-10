@@ -48,12 +48,12 @@ swarm.
 
 The following features are supported by Wing Designer
 
-- Real-time Visualizer of physical fields via Pygame
-- Fast processing of field computations via CUDA
+- Real-time visualizer of physical fields via Pygame
+- Fast field computations via CUDA
 - 4th-order Runke-Kutta solver of compressible Navier-Stokes equations
 - Parametrization of wing via Bezier splines
 - Generation of label data via multiple simulation runs
-- Trainer of surrogate MLP-model
+- Trainer of surrogate MLP-model with cross-validation
 - Wing optimization via particle swarm based gradient descent optimization
 
 Note that theory.txt contains a short theoretical derivation of the numerical equations used.
