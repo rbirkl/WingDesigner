@@ -58,8 +58,7 @@ def show_optimum(screen: Surface, optimized_input: Tensor):
 def main():
     warnings.simplefilter('ignore', NumbaPerformanceWarning)
 
-    screen = initialize_visualization("Training")
-
+    screen = initialize_visualization("Labelling")
     inputs, labels = generate_labels(screen)
     pygame.quit()
 
@@ -68,7 +67,6 @@ def main():
     optimized_input = optimize(inputs, model)
 
     screen = initialize_visualization("Optimum")
-
     show_optimum(screen, optimized_input)
 
 
