@@ -9,12 +9,12 @@ import warnings
 
 import numpy as np
 
-from ai import COLOR_WING, generate_labels, optimize, train
 from numba import NumbaPerformanceWarning
-from physics import initialize_physics, update_physics, WING_CONTROL_POINTS
+from src.ai import COLOR_WING, generate_labels, optimize, train
+from src.physics import initialize_physics, update_physics, WING_CONTROL_POINTS
+from src.visualization import initialize_visualization, visualize_scalar, visualize_vector
 from pygame.surface import Surface
 from torch import Tensor
-from visualization import initialize_visualization, visualize_scalar, visualize_vector
 
 
 def show_optimum(screen: Surface, optimized_input: Tensor):

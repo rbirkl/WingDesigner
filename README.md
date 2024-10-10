@@ -56,7 +56,7 @@ The following features are supported by Wing Designer
 
 - Real-time visualizer of physical fields via Pygame
 - Fast field computations via CUDA
-- 4th-order Runke-Kutta solver of compressible Navier-Stokes equations
+- 4th-order Runke-Kutta solver of compressible Navier-Stokes equations with gravitation
 - Parametrization of wing via Bezier splines
 - Generation of label data via multiple simulation runs
 - Trainer of surrogate MLP-model with cross-validation

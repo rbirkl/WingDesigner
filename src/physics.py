@@ -6,14 +6,14 @@
 
 import numpy as np
 
-from kernels import *
+from src.kernels import *
 
-from maths import bezier_curve, div, execute, get, grad, grad_div, laplacian_s, laplacian_v
 from numba import cuda
 from numba.cuda.cudadrv.devicearray import DeviceNDArray
 from numpy import ndarray
+from src.maths import bezier_curve, div, execute, get, grad, grad_div, laplacian_s, laplacian_v
+from src.visualization import RESOLUTION
 from typing import Tuple
-from visualization import RESOLUTION
 
 # CONTROL --------------------------------------------------------------------------------------------------------------
 

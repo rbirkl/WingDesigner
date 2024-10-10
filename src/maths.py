@@ -6,15 +6,15 @@
 
 import numpy as np
 
-from kernels import *
+from src.kernels import *
 
 from numba import cuda
 from numba.cuda.cudadrv.devicearray import DeviceNDArray
 from numba.cuda.dispatcher import CUDADispatcher
 from numpy import ndarray
 from scipy.special import comb
+from src.visualization import RESOLUTION
 from typing import Optional, Tuple
-from visualization import RESOLUTION
 
 # CUDA -----------------------------------------------------------------------------------------------------------------
 

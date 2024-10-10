@@ -4,16 +4,16 @@ import torch
 
 import numpy as np
 
-from physics import initialize_physics, update_physics, WING_CONTROL_POINTS
 from pygame.surface import Surface
 from sklearn.model_selection import KFold
+from src.physics import initialize_physics, update_physics, WING_CONTROL_POINTS
+from src.visualization import visualize_scalar, visualize_vector
 from time import time
 from torch import from_numpy, load, save, Tensor
 from torch.nn import Linear, Module, MSELoss, ReLU, Sequential
 from torch.optim import Adam
 from torch.utils.data import DataLoader, TensorDataset
 from typing import List, Dict
-from visualization import visualize_scalar, visualize_vector
 
 # CONTROL --------------------------------------------------------------------------------------------------------------
 
