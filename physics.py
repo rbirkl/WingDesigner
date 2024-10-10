@@ -11,6 +11,7 @@ from kernels import *
 from maths import bezier_curve, div, execute, get, grad, grad_div, laplacian_s, laplacian_v
 from numba import cuda
 from numba.cuda.cudadrv.devicearray import DeviceNDArray
+from numpy import ndarray
 from typing import Tuple
 from visualization import RESOLUTION
 
@@ -57,7 +58,7 @@ WING_RHO = 0.7 * INITIAL_RHO[0]
 INITIAL_WING_POSITION = (RESOLUTION[0] / 2, RESOLUTION[1] / 2)
 
 # The control points of the Bezier spline of the wing.
-WING_CONTROL_POINTS = np.array([[30, 0], [-24, -45], [-90, 30], [30, 0]])
+WING_CONTROL_POINTS = ((30, 0), (-24, -45), (-90, 30), (30, 0))
 
 # The number of points of the wing polygon.
 NUMBER_POINTS = 100
@@ -97,7 +98,8 @@ def constrain_u(u: DeviceNDArray, wing_mask: DeviceNDArray):
     execute(fix_v, u, wing_mask, (0, 0))
 
 
-def initialize_physics() -> Tuple[DeviceNDArray, DeviceNDArray, Tuple[float, float], DeviceNDArray]:
+def initialize_physics(wing_control_points: Tuple[Tuple[float, float]] = WING_CONTROL_POINTS) \
+        -> Tuple[DeviceNDArray, DeviceNDArray, Tuple[float, float], DeviceNDArray]:
     """
     Initialize the physical fields.
 
@@ -106,7 +108,7 @@ def initialize_physics() -> Tuple[DeviceNDArray, DeviceNDArray, Tuple[float, flo
     """
     wing_position = INITIAL_WING_POSITION
 
-    wing = bezier_curve(WING_CONTROL_POINTS, NUMBER_POINTS)
+    wing = bezier_curve(wing_control_points, NUMBER_POINTS)
     wing = cuda.to_device(wing)
 
     wing_mask = cuda.device_array(RESOLUTION, dtype=bool)
@@ -289,7 +291,8 @@ def update_rho_u(rho: DeviceNDArray, u: DeviceNDArray, wing_mask: DeviceNDArray)
 
 
 def update_wing_position(rho: DeviceNDArray, u: DeviceNDArray, wing_position: Tuple[float, float],
-                         wing: DeviceNDArray, wing_mask: DeviceNDArray) -> Tuple[float, float]:
+                         wing: DeviceNDArray, wing_mask: DeviceNDArray, move_wing: bool) \
+        -> Tuple[Tuple[float, float], ndarray]:
     """
     Update the wing position according to the forces on the wing.
 
@@ -299,9 +302,10 @@ def update_wing_position(rho: DeviceNDArray, u: DeviceNDArray, wing_position: Tu
         wing_position: The wing position.
         wing: The wing polygon.
         wing_mask: The wing mask.
+        move_wing: Move the wing?
 
     Returns:
-        The updated wing position.
+        The updated wing position and the force on the wing.
     """
     p = compute_p(rho)
 
@@ -316,15 +320,15 @@ def update_wing_position(rho: DeviceNDArray, u: DeviceNDArray, wing_position: Tu
     x = wing_position[0]
     y = wing_position[1]
 
-    if MOVE_WING:
+    if move_wing:
         x += DT * float(force[0])
         y += DT * float(force[1])
 
-    return x, y
+    return (x, y), force
 
 
-def update_physics(rho: DeviceNDArray, u: DeviceNDArray, wing_position: Tuple[float, float], wing: DeviceNDArray) -> \
-        Tuple[float, float]:
+def update_physics(rho: DeviceNDArray, u: DeviceNDArray, wing_position: Tuple[float, float], wing: DeviceNDArray,
+                   move_wing: bool = MOVE_WING) -> Tuple[Tuple[float, float], ndarray]:
     """
     Update the simulator.
 
@@ -333,14 +337,15 @@ def update_physics(rho: DeviceNDArray, u: DeviceNDArray, wing_position: Tuple[fl
         u: The velocity.
         wing_position: The wing position.
         wing: The wing polygon.
+        move_wing: Move the wing?
 
     Returns:
-        The updated wing position.
+        The updated wing position and the force on the wing.
     """
     wing_mask = cuda.device_array(RESOLUTION, dtype=bool)
     execute(inside_polygon, wing_position, wing, result=wing_mask)
 
     update_rho_u(rho, u, wing_mask)
-    wing_position = update_wing_position(rho, u, wing_position, wing, wing_mask)
+    wing_position, force = update_wing_position(rho, u, wing_position, wing, wing_mask, move_wing)
 
-    return wing_position
+    return wing_position, force

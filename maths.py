@@ -169,7 +169,19 @@ def grad_div(vector: DeviceNDArray) -> DeviceNDArray:
     return execute(combine, ddiv_vector_dx, ddiv_vector_dy)
 
 
-def bezier_curve(control_points: ndarray, number_points) -> ndarray:
+def bezier_curve(control_points: ndarray, number_points: int) -> ndarray:
+    """
+    Compute a Bezier curve.
+
+    Args:
+        control_points: The paramters of the curve.
+        number_points: The number of points of the output.
+
+    Returns:
+        The computed Bezier polygon.
+    """
+    control_points = np.array(control_points)
+
     n = len(control_points) - 1
     t_values = np.linspace(0, 1, number_points)
 

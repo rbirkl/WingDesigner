@@ -15,10 +15,10 @@ from pygame.surface import Surface
 # SIMULATION -----------------------------------------------------------------------------------------------------------
 
 # The window title.
-TITLE = "Wing Designer"
+TITLE = "WD"
 
 # The resolution as (width, height).
-RESOLUTION = (512, 256)
+RESOLUTION = (256, 256)
 
 # ARROW VISUALIZATION --------------------------------------------------------------------------------------------------
 
@@ -38,15 +38,18 @@ HEAD_ANGLE = 0.1
 COLOR_ARROW = (0, 0, 255)
 
 
-def initialize_visualization() -> Surface:
+def initialize_visualization(subtitle: str) -> Surface:
     """
     Initialize the visualization.
+
+    Args:
+        subtitle: The window subtitle.
 
     Returns:
         The visualization screen.
     """
     pygame.init()
-    pygame.display.set_caption(TITLE)
+    pygame.display.set_caption(TITLE + " - " + subtitle)
     return pygame.display.set_mode(RESOLUTION)
 
 
