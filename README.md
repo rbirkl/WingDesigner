@@ -4,7 +4,8 @@ An AI-based designer of optimal airplane wings.
 
 ## Demo
 
-https://github.com/user-attachments/assets/c96a7835-cab7-4433-9b60-bbe232aaa105
+https://github.com/user-attachments/assets/eac481ff-720d-4853-86ed-15046c83884a
+
 ![Optimal_Wing](https://github.com/user-attachments/assets/743016b0-5a8d-459c-8176-b5294286fefb)
 
 ## Contents
